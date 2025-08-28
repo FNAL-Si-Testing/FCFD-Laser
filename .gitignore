@@ -1,0 +1,128 @@
+# ------------------------------
+# Python
+# ------------------------------
+__pycache__/
+*.py[cod]
+*.so
+*.egg
+*.egg-info/
+dist/
+build/
+.eggs/
+*.manifest
+*.spec
+
+# Virtual environments
+.venv/
+venv/
+env/
+ENV/
+*.env
+*.venv
+
+# Jupyter/Colab
+.ipynb_checkpoints
+*.ipynb_save
+*.ipynb.old
+
+# Logs and profiles
+*.log
+*.out
+*.err
+*.prof
+*.profile
+*.pstats
+
+# Coverage/Testing
+.coverage
+coverage.xml
+htmlcov/
+.cache/
+.pytest_cache/
+.tox/
+.mypy_cache/
+.dmypy.json
+.pyre/
+.pytype/
+hypothesis/
+
+# Temporary files
+*.tmp
+*.temp
+*.bak
+*.swp
+*.swo
+
+# IDE/Editor specific
+.vscode/
+.idea/
+*.sublime-workspace
+*.sublime-project
+
+# ------------------------------
+# C++ / Build Artifacts
+# ------------------------------
+# Compiled object files, static and dynamic libs
+*.o
+*.obj
+*.lo
+*.la
+*.al
+*.libs
+*.so
+*.so.*
+*.dylib
+*.dll
+*.a
+*.lib
+*.exe
+*.out
+*.app
+*.pdb
+
+# Build directories
+build/
+cmake-build-*/
+CMakeFiles/
+CMakeCache.txt
+Makefile
+*.cmake
+*.ninja
+*.ninja_deps
+*.ninja_log
+
+# Debugging
+*.dSYM/
+*.stackdump
+*.core
+
+# ------------------------------
+# General
+# ------------------------------
+*.DS_Store
+Thumbs.db
+desktop.ini
+*.lock
+*.pid
+
+# ------------------------------
+# Custom Project Artifacts
+# ------------------------------
+# Add patterns here for generated data, checkpoints, or binaries
+results/
+data/
+models/
+logs/
+plots/
+checkpoints/
+
+# ------------------------------
+# Ignore secrets and configs
+# ------------------------------
+*.key
+*.pem
+*.crt
+*.token
+config.yaml
+*.json
+*.h5
