@@ -75,7 +75,7 @@ def motor_task(motors: Motors,
         X, Y, Z = _coord_from_index(ix, iy, iz, dX, dY, dZ, home_X, home_Y, home_Z)
         rel_dX, rel_dY, rel_dZ = X - prevX, Y - prevY, Z - prevZ
 
-        logger.info(f"Step {i+1}/{total_steps}: Moving to ({X}, {Y}, {Z}) -> From ({prevX}, {prevY}, {prevZ})")
+        logger.info(f"Step {i+1}/{total_steps}: Moving From ({prevX}, {prevY}, {prevZ}) to -> ({X}, {Y}, {Z}).")
         motors.move_XYZ_R(dX=rel_dX, dY=rel_dY, dZ=rel_dZ, wait_time=wait_ms)
 
         prevX, prevY, prevZ = X, Y, Z
@@ -125,7 +125,7 @@ def motor_daq_task(args, conversion_queue):
         if args.run_motors:
             X, Y, Z = _coord_from_index(ix, iy, iz, args.dX, args.dY, args.dZ, args.home_X, args.home_Y, args.home_Z)
             rel_dX, rel_dY, rel_dZ = X - prevX, Y - prevY, Z - prevZ
-            logger.info(f"Step {i}/{total_scans}: Moving to ({X}, {Y}, {Z}) -> From ({prevX}, {prevY}, {prevZ})")
+            logger.info(f"Step {i}/{total_scans}: Moving From ({prevX}, {prevY}, {prevZ}) to -> ({X}, {Y}, {Z}).")
             motors.move_XYZ_R(dX=rel_dX, dY=rel_dY, dZ=rel_dZ, wait_time=args.wait_ms)
             prevX, prevY, prevZ = X, Y, Z
             time.sleep(args.wait_ms / 1000) # Wait for second (stabilize the motor)

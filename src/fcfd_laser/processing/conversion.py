@@ -14,7 +14,7 @@ except Exception as e:
     raise RuntimeError("PyROOT is required for conversion. Ensure ROOT is available in your env.") from e
 
 
-# ---- Fixed offsets in LeCroy WAVEDESC (same as your legacy) ----
+# ---- Offsets in LeCroy WAVEDESC ----
 WAVEDESC = 11
 aCOMM_TYPE         = WAVEDESC + 32
 aCOMM_ORDER        = WAVEDESC + 34
