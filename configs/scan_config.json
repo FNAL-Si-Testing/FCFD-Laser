@@ -1,0 +1,18 @@
+{   
+    "dX": 2, 
+    "nX": 1,
+    "dY": 0,
+    "nY": 1,
+    "dZ": 0, 
+    "nZ": 1,
+    "wait_ms": 200,
+    "home_X": 45910,
+    "home_Y": 35000,
+    "home_Z": 86500,
+    "pattern": "xz_serpentine",
+    "run_motors": true,
+    "run_daq": true,
+    "run_conversion": true,
+    "run_preprocessing": false
+  }
+  

@@ -1,0 +1,26 @@
+{
+  "channels": {
+    "C1": { "v_scale": 0.500, "v_pos": 0.0, "coupling": "DC50", "enabled": true },
+    "C2": { "v_scale": 0.100, "v_pos": 0.0, "coupling": "DC50", "enabled": true },
+    "C3": { "v_scale": 0.080, "v_pos": 0.0, "coupling": "DC50", "enabled": true },
+    "C4": { "v_scale": 0.100, "v_pos": 0.0, "coupling": "DC50", "enabled": true },
+    "C5": { "v_scale": 0.080, "v_pos": 0.0, "coupling": "DC50", "enabled": true },
+    "C6": { "v_scale": 0.100, "v_pos": 0.0, "coupling": "DC50", "enabled": true },
+    "C7": { "v_scale": 0.080, "v_pos": 0.0, "coupling": "DC50", "enabled": true },
+    "C8": { "enabled": false }
+  },
+  "timebase": {
+    "horizontal_window_ns": 500,
+    "time_offset_ns": 0
+  },
+  "trigger": {
+    "source": "C1",
+    "level_v": 1.5,
+    "slope": "POSitive",
+    "holdoff_ns": 400
+  },
+  "acquisition": {
+    "segments": 1000,
+    "bandwidth_limit": "OFF"
+  }
+}

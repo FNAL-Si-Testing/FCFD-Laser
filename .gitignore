@@ -1,0 +1,95 @@
+# ===== PYTHON (compiled, virtualenv, cache, notebook checkpoints) =====
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+*.egg-info/
+*.egg
+*.log
+*.bak
+*.swp
+*.swo
+*.tmp
+*.tmp.*
+*.DS_Store
+
+# Jupyter notebook checkpoints
+.ipynb_checkpoints/
+
+# Python virtualenvs
+.env/
+.venv/
+env/
+venv/
+pip-wheel-metadata/
+poetry.lock
+
+# ===== BUILD OUTPUT / ARTIFACTS =====
+build/
+dist/
+cpp/build/
+*.o
+*.out
+*.a
+*.dylib
+*.dll
+*.exe
+
+# ===== DATA/LOG/OUTPUT DIRECTORIES =====
+output/
+logs/
+data/
+data_*    # if you have per-run data dirs (adjust as needed)
+*_runs_converted/
+converted_roots.tar
+*.root
+*.dat
+*.h5
+*.hdf5
+*.parquet
+*.npz
+*.npy
+*.csv
+
+# Old/archived/backup directories (common bad practices, but for safety)
+data_old/
+logs_2/
+
+# ===== PROJECT-SPECIFIC ANALYSIS/FIGURE OUTPUT =====
+figs/
+figures/
+*.png
+*.jpg
+*.jpeg
+*.tiff
+*.pdf
+*.svg
+
+# ===== OS/MISCELLANEOUS =====
+*.DS_Store
+Thumbs.db
+ehthumbs.db
+Icon?
+.idea/
+.vscode/
+*.code-workspace
+
+# ===== GIT/SVN BACKUP FILES =====
+*~
+*.orig
+*.rej
+*.swp
+*.swo
+
+# ===== CMAKE/BINARY TEMP FILES =====
+CMakeFiles/
+CMakeCache.txt
+cmake_install.cmake
+Makefile
+
+# ===== SLURM/HPC LOGS =====
+slurm-*.out
+slurm-*.err
+
+
