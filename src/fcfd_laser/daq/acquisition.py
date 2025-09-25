@@ -96,6 +96,47 @@ class LeCroyScope:
             self.logger.error(f"VISA connect failed: {e}")
             self.inst = None
             return False
+        
+    def disconnect(self) -> None:
+        """
+        Resets the scope to real-time mode and closes the connection.
+        """
+        if self.inst:
+            try:
+                self.logger.info("Setting scope to Real Time mode (SEQ OFF).")
+                self._w("SEQ OFF")
+                self.logger.info("Disconnecting from scope.")
+                self.inst.close()
+            except Exception as e:
+                self.logger.error(f"Error during disconnect: {e}")
+            finally:
+                self.inst = None
+    def auto_setup(self) -> bool:
+        """
+        Tells the scope to perform an auto-setup to find optimal settings.
+        This is useful for exploration but not for repeatable measurements.
+        """
+        if self.inst is None:
+            self.logger.error("Scope not connected.")
+            return False
+        
+        self.logger.info("Performing built-in auto-setup...")
+        # The command for LeCroy is 'AUTO_SETUP' with the 'FIND' argument.
+        self._w("AUTO_SETUP FIND")
+        self._w("WAIT") # Wait for the operation to complete
+        self.logger.info("Auto-setup complete.")
+        return True
+
+    def disconnect(self) -> None:
+        if self.inst:
+            try:
+                self.logger.info("Setting scope to Real Time mode (SEQ OFF) and disconnecting.")
+                self._w("SEQ OFF")
+                self.inst.close()
+            except Exception as e:
+                self.logger.error(f"Error during disconnect: {e}")
+            finally:
+                self.inst = None
 
     def configure_from_file(self, config_path: str) -> bool:
         if self.inst is None:
@@ -110,40 +151,54 @@ class LeCroyScope:
 
         self._w("STOP"); self._w("*CLS"); self._w("COMM_HEADER OFF")
 
-        # Vertical (identical units/behavior to your old script)
+        # --- Vertical Setup ---
         self.active_channels.clear()
+        use_auto_vscale = cfg.get("use_auto_setup", False)
+
+        if use_auto_vscale:
+            self.logger.info("Auto-scaling vertical channels...")
+
         for ch, s in sorted(cfg.get("channels", {}).items(),
                             key=lambda kv: int(kv[0].replace("C", "").strip())):
             if not s.get("enabled", False):
                 continue
             chn = ch.upper().strip()
             self.active_channels.append(int(chn.replace("C", "")))
-            v_scale_v = float(s.get("v_scale", 0.05))
-            v_pos_div = float(s.get("v_pos", 3.0))
-            coupling = s.get("coupling", "D50")
-            v_scale_mv = int(round(1000 * v_scale_v))
-            v_offset_mv = int(round(1000 * v_scale_v * v_pos_div))
             self._w(f"{chn}:TRACE ON")
+            coupling = s.get("coupling", "D50")
             self._w(f"{chn}:COUPLING {coupling}")
-            self._w(f"{chn}:VOLT_DIV {v_scale_mv}MV")
-            self._w(f"{chn}:OFFSET {v_offset_mv}MV")
-            self.logger.info(f"{chn}: {v_scale_mv} mV/div, offset {v_offset_mv} mV, {coupling}")
 
-        # Timebase
+            if use_auto_vscale:
+                # Use the targeted command to find the vertical scale for THIS channel
+                self._w(f"VBS 'app.Acquisition.{chn}.FindVerticalScale'")
+            else:
+                # Use manual settings from the file
+                v_scale_v = float(s.get("v_scale", 0.05))
+                v_pos_div = float(s.get("v_pos", 3.0))
+                v_scale_mv = int(round(1000 * v_scale_v))
+                v_offset_mv = int(round(1000 * v_scale_v * v_pos_div))
+                self._w(f"{chn}:VOLT_DIV {v_scale_mv}MV")
+                self._w(f"{chn}:OFFSET {v_offset_mv}MV")
+        
+        if use_auto_vscale:
+             self._w("WAIT") # Wait for all FindVerticalScale operations to complete
+             self.logger.info("Auto-scaling complete.")
+
+
+        # --- Timebase and Trigger are ALWAYS set manually ---
         tb = cfg.get("timebase", {})
-        horiz_ns = float(tb.get("horizontal_window_ns", 50))
+        horiz_ns = float(tb.get("horizontal_window_ns", 500))
         offs_ns  = float(tb.get("time_offset_ns", 0))
         time_div_ns = horiz_ns / 10.0
         self._w(f"TIME_DIV {time_div_ns}NS")
         self._w(f"TRIG_DELAY {int(offs_ns)} NS")
-        self.logger.info(f"Timebase: {time_div_ns:.3f} ns/div, delay {offs_ns:.0f} ns")
+        self.logger.info(f"Applied Timebase: {time_div_ns:.3f} ns/div, delay {offs_ns:.0f} ns")
 
-        # Trigger (mirror your old)
         trg = cfg.get("trigger", {})
         src = trg.get("source", "C1").upper()
-        lvl = float(trg.get("level_v", 0.150))
-        slope = str(trg.get("slope", "NEGative"))
-        holdoff_ns = int(trg.get("holdoff_ns", 0))
+        lvl = float(trg.get("level_v", 1.5))
+        slope = str(trg.get("slope", "POSitive"))
+        holdoff_ns = int(trg.get("holdoff_ns", 400))
         if holdoff_ns > 0:
             self._w(f"TRIG_SELECT Edge,SR,{src},HT,TI,HV,{float(holdoff_ns)} NS")
         else:
@@ -152,14 +207,14 @@ class LeCroyScope:
             self._w(f"{src}:TRLV {lvl:.6f}V")
             self._w(f"{src}:TRSL {slope}")
             self._w(f"TRIG_SLOPE {slope}")
-        self.logger.info(f"Trigger: {src}, {lvl} V, {slope}, holdoff {holdoff_ns} ns")
+        self.logger.info(f"Applied Trigger: {src}, {lvl} V, {slope}, holdoff {holdoff_ns} ns")
 
-        # Acquisition extras + segments (accept both keys)
+        # --- Acquisition Setup ---
         acq = cfg.get("acquisition", {})
         self._w(f"BANDWIDTH_LIMIT {acq.get('bandwidth_limit', 'OFF')}")
-        self._segments = int(acq.get("segments", acq.get("num_segments", 1)))
+        self._segments = int(acq.get("segments", 1000))
+        self.logger.info(f"Applied Acquisition: {self._segments} segments.")
 
-        # Save format: ALL_DISPLAYED, HDD, BINARY (same as old)
         self._w("STORE_SETUP ALL_DISPLAYED,HDD,AUTO,OFF,FORMAT,BINARY")
         self.logger.info("Scope configuration complete.")
         return True
@@ -169,7 +224,7 @@ class LeCroyScope:
             self.logger.error("Scope not connected.")
             return False
 
-        # Sequence ON/OFF exactly like the old script
+        # Sequence ON/OFF
         if self._segments > 1:
             self._w(f"SEQ ON,{self._segments}")
         else:

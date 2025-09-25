@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# fcfd_laser/processing/conversion.py
+# fcfd_laser/processing/preprocessing.py
 
 import subprocess
 import os

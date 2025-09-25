@@ -15,6 +15,7 @@ import json
 import random
 import glob
 import multiprocessing
+import threading
 
 from fcfd_laser.motor.motortools import Motors
 from fcfd_laser.motor.scan_patterns import PATTERNS, _coord_from_index
@@ -22,21 +23,25 @@ from fcfd_laser.motor.scan_patterns import PATTERNS, _coord_from_index
 from fcfd_laser.daq import acquisition 
 from fcfd_laser.processing.conversion import convert_run
 from fcfd_laser.processing.preprocessing import run_preprocessor
-from fcfd_laser.utils import constants, logger
+from fcfd_laser.utils import constants, logger, monitor
 from fcfd_laser.utils.evnthandler import *
 
-NUM_CONVERSION_WORKERS = multiprocessing.cpu_count() // 2 - 1
-NUM_PREPROCESSING_WORKERS = multiprocessing.cpu_count() // 2
+NUM_CPU = multiprocessing.cpu_count()
+NUM_CONVERSION_WORKERS = max(1, NUM_CPU // 2 - 1)
+NUM_PREPROCESSING_WORKERS = max(1, NUM_CPU // 2)
 
 SRC_DIR = os.path.dirname(__file__)
 PROJECT_ROOT = os.path.abspath(os.path.join(SRC_DIR, os.pardir))
 OUTPUT_DIR = os.path.join(PROJECT_ROOT, "output")
 
 # ============ [Change: Add timestamp to run directory] ================
-power = "80.0%"
-RUN_FINGERPRINT = f"Power_{power}"
-run_datetime = datetime.now().strftime("%Y%m%d_%H%M%S")
-RUN_ID = f"run_{run_datetime}_{RUN_FINGERPRINT}"
+# power = ".0%"
+# RUN_FINGERPRINT = f"Power_{power}"
+# run_datetime = datetime.now().strftime("%Y%m%d_%H%M%S")
+# RUN_ID = f"run_{run_datetime}_{RUN_FINGERPRINT}"
+
+RUN_FINGERPRINT = "DEBUG_RUN"
+RUN_ID = "DEBUG_RUN"
 
 RUN_DIR = os.path.join(OUTPUT_DIR, RUN_ID)
 LOG_DIR = os.path.join(RUN_DIR, "logs")
@@ -151,7 +156,6 @@ def motor_daq_task(args, conversion_queue):
     for _ in range(NUM_CONVERSION_WORKERS):
         conversion_queue.put(None)
         
-
 def conversion_task(scan_num: int, channels: list):
     out_path = convert_run(
         raw_dir=DATA_DIR_RAW,
@@ -162,7 +166,6 @@ def conversion_task(scan_num: int, channels: list):
     )
     logger.info(f"Converted ROOT written to: {out_path}")
     return out_path
-
 
 def conversion_task_consumer(conversion_queue, preprocessing_queue):
     """
@@ -194,7 +197,6 @@ def conversion_task_consumer(conversion_queue, preprocessing_queue):
     for _ in range(NUM_PREPROCESSING_WORKERS):
         preprocessing_queue.put(None)
 
-
 def processing_task_consumer(preprocessing_queue):
     """
     Consumer process: gets the path to a converted file from a queue and runs preprocessing.
@@ -216,7 +218,6 @@ def processing_task_consumer(preprocessing_queue):
             config_file_path=PREPROCESSOR_CONFIG,
             executable_path=PREPROCESSOR_EXECUTABLE
         )
-
 
 def parse_args():
     defaults = dict(
@@ -276,31 +277,45 @@ def main():
         f"\n============================================================================== \n"
     )
 
+    # Queues
     conversion_queue = multiprocessing.Queue()
     preprocessing_queue = multiprocessing.Queue()
 
+    # Processes
     daq_process = multiprocessing.Process(
+        name="DAQ_Process",
         target=motor_daq_task,
         args=(args, conversion_queue)
     )
     
-    
     conversion_processes = [
         multiprocessing.Process(
+            name=f"Conversion_{i}",
             target=conversion_task_consumer,
             args=(conversion_queue, preprocessing_queue)
         )
-        for _ in range(NUM_CONVERSION_WORKERS)
+        for i in range(NUM_CONVERSION_WORKERS)
     ]
 
     preprocessing_processes = [
         multiprocessing.Process(
+            name=f"Preprocessing_{i}",
             target=processing_task_consumer,
             args=(preprocessing_queue,)
         )
-        for _ in range(NUM_PREPROCESSING_WORKERS)
+        for i in range(NUM_PREPROCESSING_WORKERS)
     ]
 
+    all_processes = [daq_process] + conversion_processes + preprocessing_processes
+    monitor_thread = threading.Thread(
+        target=monitor.monitor_queues,
+        args=({
+            "Conversion Queue": conversion_queue,
+            "Preprocessing Queue": preprocessing_queue
+        }, all_processes, logger),
+        daemon=True # A daemon thread will exit when the main program exits
+    )
+    
     if args.run_daq:
         daq_process.start()
     if args.run_conversion:
@@ -309,6 +324,8 @@ def main():
     if args.run_preprocessing:
         for p in preprocessing_processes:
             p.start()
+
+    monitor_thread.start()
 
     # Join processes
     if args.run_daq:
@@ -319,7 +336,8 @@ def main():
     if args.run_preprocessing:
         for p in preprocessing_processes:
             p.join()
-
+    monitor_thread.join()
+    
     logger.info("All tasks completed.")
 
 

@@ -1,6 +1,6 @@
 {   
-    "dX": 2, 
-    "nX": 1,
+    "dX": 5000, 
+    "nX": 3,
     "dY": 0,
     "nY": 1,
     "dZ": 0, 
@@ -13,6 +13,6 @@
     "run_motors": true,
     "run_daq": true,
     "run_conversion": true,
-    "run_preprocessing": false
+    "run_preprocessing": true
   }
   

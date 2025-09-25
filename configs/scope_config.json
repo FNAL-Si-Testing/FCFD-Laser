@@ -1,4 +1,5 @@
 {
+  "use_auto_setup": true,
   "channels": {
     "C1": { "v_scale": 0.500, "v_pos": 0.0, "coupling": "DC50", "enabled": true },
     "C2": { "v_scale": 0.100, "v_pos": 0.0, "coupling": "DC50", "enabled": true },
