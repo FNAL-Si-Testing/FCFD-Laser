@@ -35,13 +35,15 @@ PROJECT_ROOT = os.path.abspath(os.path.join(SRC_DIR, os.pardir))
 OUTPUT_DIR = os.path.join(PROJECT_ROOT, "output")
 
 # ============ [Change: Add timestamp to run directory] ================
-# power = ".0%"
-# RUN_FINGERPRINT = f"Power_{power}"
-# run_datetime = datetime.now().strftime("%Y%m%d_%H%M%S")
-# RUN_ID = f"run_{run_datetime}_{RUN_FINGERPRINT}"
+DEBUG = False
+power = "90.0%"
+RUN_FINGERPRINT = f"Power_{power}"
+run_datetime = datetime.now().strftime("%Y%m%d_%H%M%S")
+RUN_ID = f"run_{run_datetime}_{RUN_FINGERPRINT}"
 
-RUN_FINGERPRINT = "DEBUG_RUN"
-RUN_ID = "DEBUG_RUN"
+if DEBUG:
+    RUN_FINGERPRINT = "DEBUG_RUN"
+    RUN_ID = "DEBUG_RUN"
 
 RUN_DIR = os.path.join(OUTPUT_DIR, RUN_ID)
 LOG_DIR = os.path.join(RUN_DIR, "logs")
@@ -192,10 +194,6 @@ def conversion_task_consumer(conversion_queue, preprocessing_queue):
         )
         # Put the path to the converted file into the preprocessing queue
         preprocessing_queue.put(out_path)
-    
-    # Signal that the conversion process is done
-    for _ in range(NUM_PREPROCESSING_WORKERS):
-        preprocessing_queue.put(None)
 
 def processing_task_consumer(preprocessing_queue):
     """
@@ -334,6 +332,8 @@ def main():
         for p in conversion_processes:
             p.join()
     if args.run_preprocessing:
+        for _ in range(NUM_PREPROCESSING_WORKERS):
+            preprocessing_queue.put(None)
         for p in preprocessing_processes:
             p.join()
     monitor_thread.join()
