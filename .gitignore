@@ -38,6 +38,7 @@ cpp/build/
 
 # ===== DATA/LOG/OUTPUT DIRECTORIES =====
 output/
+output*/
 logs/
 data/
 data_*    # if you have per-run data dirs (adjust as needed)
@@ -92,4 +93,7 @@ Makefile
 slurm-*.out
 slurm-*.err
 
+
+# ===== SLURM/HPC LOGS =====
+.env
 

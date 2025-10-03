@@ -36,7 +36,8 @@ OUTPUT_DIR = os.path.join(PROJECT_ROOT, "output")
 
 # ============ [Change: Add timestamp to run directory] ================
 DEBUG = False
-power = "90.0%"
+
+power = "80.0%"
 RUN_FINGERPRINT = f"Power_{power}"
 run_datetime = datetime.now().strftime("%Y%m%d_%H%M%S")
 RUN_ID = f"run_{run_datetime}_{RUN_FINGERPRINT}"

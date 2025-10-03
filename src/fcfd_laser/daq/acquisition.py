@@ -61,7 +61,7 @@ class LeCroyScope:
       - active_channels : List[int]
     """
 
-    def __init__(self, ip_address: str = getattr(constants, "LECROY_IP", "192.168.0.170"),
+    def __init__(self, ip_address: str = getattr(constants, "LECROY_IP", "192.168.0.169"),
                  logger: Optional[logging.Logger] = None):
         if logger is None:
             raise ValueError("logger must be provided")
@@ -110,6 +110,7 @@ class LeCroyScope:
             except Exception as e:
                 self.logger.error(f"Error during disconnect: {e}")
             finally:
+
                 self.inst = None
     def auto_setup(self) -> bool:
         """
@@ -334,10 +335,21 @@ class ScopeFileTransfer:
         os.makedirs(dest_dir, exist_ok=True)
 
         files: List[str] = []
-        for pat in patterns:
-            files.extend(glob.glob(os.path.join(self.mount_point, pat)))
-            files.extend(glob.glob(os.path.join(self.mount_point, "**", pat), recursive=True))
-        files = sorted({f for f in files if os.path.isfile(f)})
+        max_retries = 10
+        retry_delay_s = 0.5 # seconds
+        for attempt in range(max_retries):
+            self.logger.info(f"Searching for files... Attempt {attempt + 1}/{max_retries}")
+
+            for pat in patterns:
+                files.extend(glob.glob(os.path.join(self.mount_point, pat)))
+                files.extend(glob.glob(os.path.join(self.mount_point, "**", pat), recursive=True))
+            files = sorted({f for f in files if os.path.isfile(f)})
+
+            if files:
+                self.logger.info(f"Found {len(files)} files to copy.")
+                break
+            
+            time.sleep(retry_delay_s) 
 
         if not files:
             self.logger.warning(f"No files matched on scope (patterns={patterns}).")
