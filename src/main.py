@@ -1,5 +1,5 @@
-# main.py
-
+# src/main.py
+# Author: Arghya
 """
 Main script for running a scan.
 
@@ -23,8 +23,19 @@ from fcfd_laser.motor.scan_patterns import PATTERNS, _coord_from_index
 from fcfd_laser.daq import acquisition 
 from fcfd_laser.processing.conversion import convert_run
 from fcfd_laser.processing.preprocessing import run_preprocessor
+from fcfd_laser.processing.ultra_processing import (
+    ultra_processed_columns, save_to_root, LP2_50_COLS
+)
 from fcfd_laser.utils import constants, logger, monitor
 from fcfd_laser.utils.evnthandler import *
+
+CHANNEL_MAP = {
+    1: 4,  # Ana Ch 2 (idx 1) -> Dig Ch 5 (idx 4)
+    2: 5,  # Ana Ch 3 (idx 2) -> Dig Ch 6 (idx 5)
+    3: 6,  # Ana Ch 4 (idx 3) -> Dig Ch 7 (idx 6)
+}
+ANALOG_CHANNELS = sorted(list(CHANNEL_MAP.keys()))
+DIGITAL_CHANNELS = sorted(list(CHANNEL_MAP.values()))
 
 NUM_CPU = multiprocessing.cpu_count()
 NUM_CONVERSION_WORKERS = max(1, NUM_CPU // 2 - 1)
@@ -35,9 +46,11 @@ PROJECT_ROOT = os.path.abspath(os.path.join(SRC_DIR, os.pardir))
 OUTPUT_DIR = os.path.join(PROJECT_ROOT, "output")
 
 # ============ [Change: Add timestamp to run directory] ================
+# DEBUG = True
 DEBUG = False
 
-power = "80.0%"
+power = "89.9_100Hz_New_Connections"
+# power = "MIP"
 RUN_FINGERPRINT = f"Power_{power}"
 run_datetime = datetime.now().strftime("%Y%m%d_%H%M%S")
 RUN_ID = f"run_{run_datetime}_{RUN_FINGERPRINT}"
@@ -51,6 +64,7 @@ LOG_DIR = os.path.join(RUN_DIR, "logs")
 DATA_DIR_RAW = os.path.join(RUN_DIR, "raw")
 DATA_DIR_CONV = os.path.join(RUN_DIR, "converted")
 DATA_DIR_PROC = os.path.join(RUN_DIR, "processed")
+DATA_DIR_ULTRA_PROC = os.path.join(RUN_DIR, "ultra_processed")
 
 PREPROCESSOR_EXECUTABLE = os.path.join(SRC_DIR, "cpp", "build", "NetScopeStandaloneDat2Root")
 CONFIG_DIR = os.path.join(PROJECT_ROOT, "configs")
@@ -64,6 +78,7 @@ print(f"Log file created at {LOG_DIR}")
 os.makedirs(DATA_DIR_RAW, exist_ok=True)
 os.makedirs(DATA_DIR_CONV, exist_ok=True)
 os.makedirs(DATA_DIR_PROC, exist_ok=True)
+os.makedirs(DATA_DIR_ULTRA_PROC, exist_ok=True)
 
 def motor_task(motors: Motors,
                dX: float, nX: int,
@@ -119,7 +134,8 @@ def motor_daq_task(args, conversion_queue):
     # Initialize DAQ
     if args.run_daq:
         scope = acquisition.LeCroyScope(logger=logger)
-        if not scope.connect(): raise Exception("Failed to connect to LeCroy Scope.")
+        # TZ: I added the timeout and we should fix the spelling
+        if not scope.connect(timeout_ms=constants.LECROY_TMIEOUT): raise Exception("Failed to connect to LeCroy Scope.")
         if not scope.configure_from_file(args.scope_config): raise Exception("Failed to configure LeCroy Scope.")
         xfer = acquisition.ScopeFileTransfer(logger=logger, scope=scope)
         if not xfer.mount(): raise Exception("Failed to mount LeCroy Waveforms share.")
@@ -130,8 +146,9 @@ def motor_daq_task(args, conversion_queue):
     total_scans = args.nX * args.nY * args.nZ
     scan_num = 1
     for i, (ix, iy, iz) in enumerate(PATTERNS[args.pattern](args.nX, args.nY, args.nZ)):
+        X, Y, Z = _coord_from_index(ix, iy, iz, args.dX, args.dY, args.dZ, args.home_X, args.home_Y, args.home_Z)
+
         if args.run_motors:
-            X, Y, Z = _coord_from_index(ix, iy, iz, args.dX, args.dY, args.dZ, args.home_X, args.home_Y, args.home_Z)
             rel_dX, rel_dY, rel_dZ = X - prevX, Y - prevY, Z - prevZ
             logger.info(f"Step {i}/{total_scans}: Moving From ({prevX}, {prevY}, {prevZ}) to -> ({X}, {Y}, {Z}).")
             motors.move_XYZ_R(dX=rel_dX, dY=rel_dY, dZ=rel_dZ, wait_time=args.wait_ms)
@@ -144,7 +161,7 @@ def motor_daq_task(args, conversion_queue):
                 scope.acquire_and_wait()
                 xfer.copy_trace(trace_num=scan_num, dest_dir=DATA_DIR_RAW, cleanup=True)
                 # Put the scan number into the conversion queue
-                conversion_queue.put(scan_num)
+                conversion_queue.put({"scan_num": scan_num, "x_um": X, "y_um": Y, "z_um": Z})
                 scan_num += 1
             except Exception as e:
                 logger.error(f"DAQ task failed: {e}")
@@ -176,40 +193,45 @@ def conversion_task_consumer(conversion_queue, preprocessing_queue):
     and puts the output file path into another queue.
     """
     while True:
-        scan_num = conversion_queue.get()
-        if scan_num is None:
+        msg = conversion_queue.get()
+        if msg is None:
             break
-        
+        scan_num = msg["scan_num"]
+        x_um, y_um, z_um = msg["x_um"], msg["y_um"], msg["z_um"]
+
         active_channels = [
             int(os.path.basename(p).split('--')[0][1:])
             for p in sorted(glob.glob(os.path.join(DATA_DIR_RAW, f"C*--Trace{scan_num}.trc")))
         ]
-        
         if not active_channels:
             logger.warning(f"Conversion: No raw files found for scan {scan_num}. Skipping.")
             continue
 
-        out_path = conversion_task(
-            scan_num=scan_num,
-            channels=active_channels,
-        )
-        # Put the path to the converted file into the preprocessing queue
-        preprocessing_queue.put(out_path)
+        out_path = conversion_task(scan_num=scan_num, channels=active_channels)
+
+        # pass converted path + coords forward
+        preprocessing_queue.put({
+            "scan_num": scan_num,
+            "x_um": x_um, "y_um": y_um, "z_um": z_um,
+            "converted_file_path": out_path
+        })
+
 
 def processing_task_consumer(preprocessing_queue):
-    """
-    Consumer process: gets the path to a converted file from a queue and runs preprocessing.
-    """
     while True:
-        converted_file_path = preprocessing_queue.get()
-        if converted_file_path is None:
+        msg = preprocessing_queue.get()
+        if msg is None:
             break
+
+        converted_file_path = msg["converted_file_path"]
+        scan_num = msg["scan_num"]
+        x_um, y_um, z_um = msg["x_um"], msg["y_um"], msg["z_um"]
 
         processed_file_path = os.path.join(
             DATA_DIR_PROC,
             f"processed_{os.path.basename(converted_file_path)}"
         )
-        
+
         run_preprocessor(
             logger=logger,
             converted_file_path=converted_file_path,
@@ -217,6 +239,20 @@ def processing_task_consumer(preprocessing_queue):
             config_file_path=PREPROCESSOR_CONFIG,
             executable_path=PREPROCESSOR_EXECUTABLE
         )
+
+        cols = ultra_processed_columns(
+            converted_file_path=converted_file_path,
+            processed_file_path=processed_file_path,
+            analog_channels=ANALOG_CHANNELS,
+            channel_map=CHANNEL_MAP,
+            run_id=scan_num,          # simple: use scan_num as run_id
+            x_um=x_um, y_um=y_um, z_um=z_um,
+            n_events=5000, # TODO: Make this configurable form --scan_config.json
+            lp2_cols=LP2_50_COLS,
+        )
+        save_to_root(cols, out_dir=DATA_DIR_ULTRA_PROC, run_id=scan_num, 
+                     x_um=x_um, y_um=y_um, z_um=z_um)
+
 
 def parse_args():
     defaults = dict(

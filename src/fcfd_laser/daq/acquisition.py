@@ -61,7 +61,7 @@ class LeCroyScope:
       - active_channels : List[int]
     """
 
-    def __init__(self, ip_address: str = getattr(constants, "LECROY_IP", "192.168.0.169"),
+    def __init__(self, ip_address: str = getattr(constants, "LECROY_IP"),
                  logger: Optional[logging.Logger] = None):
         if logger is None:
             raise ValueError("logger must be provided")
@@ -85,8 +85,11 @@ class LeCroyScope:
     # ---- public API ----
     def connect(self, timeout_ms: int = 300000) -> bool:
         try:
+            # print(self.ip)
             self.inst = self.rm.open_resource(f"TCPIP0::{self.ip}::inst0::INSTR")
-            self.inst.timeout = timeout_ms
+            # self.inst = self.rm.open_resource(f"VICP::{self.ip}::INSTR")
+            # self.inst.timeout = timeout_ms
+            del self.inst.timeout
             self.inst.encoding = "latin_1"
             self.inst.clear()
             self._w("COMM_HEADER OFF")
@@ -192,6 +195,7 @@ class LeCroyScope:
         offs_ns  = float(tb.get("time_offset_ns", 0))
         time_div_ns = horiz_ns / 10.0
         self._w(f"TIME_DIV {time_div_ns}NS")
+        # self._w(f"TIME_DIV 500MS")
         self._w(f"TRIG_DELAY {int(offs_ns)} NS")
         self.logger.info(f"Applied Timebase: {time_div_ns:.3f} ns/div, delay {offs_ns:.0f} ns")
 
@@ -200,15 +204,24 @@ class LeCroyScope:
         lvl = float(trg.get("level_v", 1.5))
         slope = str(trg.get("slope", "POSitive"))
         holdoff_ns = int(trg.get("holdoff_ns", 400))
-        if holdoff_ns > 0:
-            self._w(f"TRIG_SELECT Edge,SR,{src},HT,TI,HV,{float(holdoff_ns)} NS")
+        trig_type = str(trg.get("type", "EDGE")).upper()
+
+        if trig_type == "WIDTH":
+            min_ns = float(trg.get("min_width_ns", 150))
+            max_ns = float(trg.get("max_width_ns", 200))
+            self._w(f"TRIG_SELECT EDGE,SR,{src},HT,P2,HV,{min_ns}NS,HV2,{max_ns}NS")
+            self.logger.info(f"Applied WIDTH trigger on {src}: [{min_ns} ns, {max_ns} ns] @ {lvl} V")
+
         else:
-            self._w(f"TRIG_SELECT Edge,SR,{src},HT,OFF")
-        if src != "LINE":
-            self._w(f"{src}:TRLV {lvl:.6f}V")
-            self._w(f"{src}:TRSL {slope}")
-            self._w(f"TRIG_SLOPE {slope}")
-        self.logger.info(f"Applied Trigger: {src}, {lvl} V, {slope}, holdoff {holdoff_ns} ns")
+            if holdoff_ns > 0:
+                self._w(f"TRIG_SELECT Edge,SR,{src},HT,TI,HV,{float(holdoff_ns)} NS")
+            else:
+                self._w(f"TRIG_SELECT Edge,SR,{src},HT,OFF")
+            if src != "LINE":
+                self._w(f"{src}:TRLV {lvl:.6f}V")
+                self._w(f"{src}:TRSL {slope}")
+                self._w(f"TRIG_SLOPE {slope}")
+            self.logger.info(f"Applied Trigger: {src}, {lvl} V, {slope}, holdoff {holdoff_ns} ns")
 
         # --- Acquisition Setup ---
         acq = cfg.get("acquisition", {})
@@ -262,7 +275,7 @@ class ScopeFileTransfer:
                  max_workers: Optional[int] = 8):
         self.logger = logger
         self.scope = scope
-        self.ip = ip or getattr(scope, "ip", None) or getattr(constants, "LECROY_IP", "192.168.0.170")
+        self.ip = ip or getattr(scope, "ip", None) or getattr(constants, "LECROY_IP")
         self.mount_point = mount_point or getattr(constants, "MOUNT_POINT", "/mnt")
         self.max_workers = max_workers
         self._own_mount = False
@@ -325,7 +338,7 @@ class ScopeFileTransfer:
     def copy_trace(self, trace_num: int, dest_dir: str, cleanup: bool = True) -> int:
         """Build patterns from scope.active_channels and copy them."""
         chans = getattr(self.scope, "active_channels", []) or []
-        patterns = [f"C{ch}--Trace{trace_num}.trc" for ch in chans]
+        patterns = [f"C{ch}--Trace{trace_num}*.trc" for ch in chans]
         return self.copy_patterns(patterns=patterns, dest_dir=dest_dir, cleanup=cleanup)
 
     def copy_patterns(self, patterns: List[str], dest_dir: str, cleanup: bool = True) -> int:

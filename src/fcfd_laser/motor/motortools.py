@@ -78,49 +78,73 @@ class Motors:
                      f"Y: {posy.Position} um, "
                      f"Z: {posz.Position} um")
 
-    def move_XYZ_R(self, dX=0, dY=0, dZ=0, wait_time=100, verbose=False):
-        if dX: # Note 0 is False
-            self.logger.info(f"move_rel axis=X dX={dX}um wait={wait_time}")
-            self.axis_x.command_movr_calb(dX)
-            if verbose: self.logger.info(f"Moving X by {dX} um")
-            self.axis_x.command_wait_for_stop(wait_time)
-        if dY: # Note 0 is False
-            self.logger.info(f"move_rel axis=Y dY={dY}um wait={wait_time}")
-            self.axis_y.command_movr_calb(dY)
-            if verbose: self.logger.info(f"Moving Y by {dY} um")
-            self.axis_y.command_wait_for_stop(wait_time)
-        if dZ: # Note 0 is False
-            self.logger.info(f"move_rel axis=Z dZ={dZ}um wait={wait_time}")
-            self.axis_z.command_movr_calb(dZ)
-            if verbose: self.logger.info(f"Moving Z by {dZ} um")
-            self.axis_z.command_wait_for_stop(wait_time)
+    def move_XYZ_R(self, dX=0, dY=0, dZ=0, wait_time=100, verbose=False, retries=3):
+        attempts = 0
+        while attempts < retries:
+            try:
+                if dX: # Note 0 is False
+                    self.axis_x.command_movr_calb(dX)
+                    if verbose: self.logger.info(f"Moving X by {dX} um")
+                    self.axis_x.command_wait_for_stop(wait_time)
+                if dY: # Note 0 is False
+                    self.axis_y.command_movr_calb(dY)
+                    if verbose: self.logger.info(f"Moving Y by {dY} um")
+                    self.axis_y.command_wait_for_stop(wait_time)
+                if dZ: # Note 0 is False
+                    self.axis_z.command_movr_calb(dZ)
+                    if verbose: self.logger.info(f"Moving Z by {dZ} um")
+                    self.axis_z.command_wait_for_stop(wait_time)
+                break
+            except Exception as e:
+                self.logger.error(f"Move failed with error: {e}")
+                attempts += 1
+                if attempts == retries:
+                    raise RuntimeError("Failed to move to XYZ_R.")
     
     def move_home(self, X=constants.HOME_COORDINATE[0], 
                   Y=constants.HOME_COORDINATE[1], wait_time=100, 
-                  verbose=False):
-        self.axis_x.command_move_calb(X)
-        self.axis_x.command_wait_for_stop(wait_time)
-        self.axis_y.command_move_calb(Y)
-        self.axis_y.command_wait_for_stop(wait_time)
+                  verbose=False, retries=3):
+        attempts = 0
+        while attempts < retries:
+            try:
+                self.axis_x.command_move_calb(X)
+                self.axis_x.command_wait_for_stop(wait_time)
+                self.axis_y.command_move_calb(Y)
+                self.axis_y.command_wait_for_stop(wait_time)
 
-        posx, posy, posz = self.get_calb()
-        self.logger.info("Motors moved to home.")
-        self.logger.info(f"Motors new_position at X={posx.Position}um Y={posy.Position}um Z={posz.Position}um")
+                posx, posy, posz = self.get_calb()
+                self.logger.info("Motors moved to home.")
+                self.logger.info(f"Motors new_position at X={posx.Position}um Y={posy.Position}um Z={posz.Position}um")
+                break            
+            except Exception as e:
+                self.logger.error(f"Move failed with error: {e}")
+                attempts += 1
+                if attempts == retries:
+                    raise RuntimeError("Failed to move to home.")
 
-    def move_XYZ(self, X=0, Y=0, Z=0, wait_time=100, verbose=False):
+    def move_XYZ(self, X=0, Y=0, Z=0, wait_time=100, verbose=False, retries=3):
 
-        if X: # Note 0 is False
-            self.axis_x.command_move_calb(X)
-            if verbose: self.logger.info(f"Moving Motors X to {X} um")
-            self.axis_x.command_wait_for_stop(wait_time)
-        if Y: # Note 0 is False
-            self.axis_y.command_move_calb(Y)
-            if verbose: self.logger.info(f"Moving Motors Y to {X} um")
-            self.axis_y.command_wait_for_stop(wait_time)
-        if Z: # Note 0 is False
-            self.axis_z.command_move_calb(Z)
-            if verbose: self.logger.info(f"Moving Motors Z to {X} um")
-            self.axis_z.command_wait_for_stop(wait_time)
+        attempts = 0
+        while attempts < retries:
+            try:
+                if X: # Note 0 is False
+                    self.axis_x.command_move_calb(X)
+                    if verbose: self.logger.info(f"Moving Motors X to {X} um")
+                    self.axis_x.command_wait_for_stop(wait_time)
+                if Y: # Note 0 is False
+                    self.axis_y.command_move_calb(Y)
+                    if verbose: self.logger.info(f"Moving Motors Y to {X} um")
+                    self.axis_y.command_wait_for_stop(wait_time)
+                if Z: # Note 0 is False
+                    self.axis_z.command_move_calb(Z)
+                    if verbose: self.logger.info(f"Moving Motors Z to {X} um")
+                    self.axis_z.command_wait_for_stop(wait_time)
+                break
+            except Exception as e:
+                self.logger.error(f"Move failed with error: {e}")
+                attempts += 1
+                if attempts == retries:
+                    raise RuntimeError("Failed to move to XYZ.")
 
 
     def a_scan(self, wait_time=100, step_in_um = 0, Num_of_steps = 0, verbose=False):

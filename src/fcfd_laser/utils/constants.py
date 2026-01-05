@@ -7,9 +7,9 @@ WAVEFORMS_PATH = MOUNT_POINT
 
 
 # establish communication with scope
-LECROY_IP = "192.168.0.169"
-# LECROY_IP = "10.0.8.1" 
-LECROY_TMIEOUT = 3000000
+LECROY_IP = "192.168.0.174"
+# LECROY_IP = "169.254.116.213" 
+LECROY_TMIEOUT = None
 LECROY_ENCODING = 'latin_1'
 
 BASE_PATH = "/home/arcadia/Documents"

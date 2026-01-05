@@ -170,8 +170,8 @@ def convert_run(raw_dir: str,
 
         # Consistency checks (hard errors for shape mismatch)
         if nseg_c != nseg or pts_c != pts:
-            raise RuntimeError(f"{os.path.basename(fp)}: segments/points differ from reference "
-                               f"({nseg_c},{pts_c}) vs ({nseg},{pts}).")
+            error_msg = f"{os.path.basename(fp)}: segments/points differ from reference ({nseg_c},{pts_c}) vs ({nseg},{pts}). \n This can also happen due to improper Laser Frequecy. \n(For debugging,check hardware too)."
+            raise RuntimeError(error_msg)
         if abs(dt_c - dt) > 1e-15:
             logger.warning(f"{os.path.basename(fp)}: horiz_dt differs from ref ({dt_c} vs {dt}).")
 
